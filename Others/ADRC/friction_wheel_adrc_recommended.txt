@@ -1,0 +1,69 @@
+% 摩擦轮 ADRC 推荐配置
+sample_time_s = 0.00100000;
+identified_tau_s = 0.02733022;
+identified_b0 = 8429.20542283;
+controller_bandwidth = 81.75967177;
+observer_ratio = 10.00000000;
+error_linear_zone = 28.00000000;
+recommended_b0 = 5003.73395626;
+model_contact_time_scale = 1.00000000;
+model_dynamic_load_factor = 1.00000000;
+model_supply_sag_ratio = 0.00000000;
+model_supply_recovery_tau_s = 0.00000000;
+target_speed_mode = manual_rpm;
+target_speed_rpm = 10504.22624407;
+surface_speed_mps = 22.00000000;
+output_limit = 3.00000000;
+output_rate_limit = 1000.00000000;
+objective_cost = 129.21631703;
+target_speed_rpm = 10504.22624407;
+iae = 18909.75707323;
+speed_rmse = 9520.08258385;
+max_abs_error = 9714.70397632;
+final_mean_speed = 791.03999981;
+final_mean_error = 9713.18624425;
+control_peak = 3.00000000;
+control_rms = 3.00000000;
+disturbance_rmse = 12777.60064270;
+max_shot_droop_rpm = 9714.70397632;
+mean_shot_droop_rpm = 9708.03955227;
+mean_recovery_time_s = N/A;
+rise_time_s = N/A;
+settling_time_s = N/A;
+overshoot_pct = N/A;
+
+% ================= 可直接复制到工程的代码 =================
+adrc_param_t param = {
+    .sample_time_s = 0.00100000f,
+    .b0 = 5003.73395626f,
+    .controller_bandwidth = 81.75967177f,
+    .observer_bandwidth_ratio = 10.00000000f,
+    .tracking_gain = 0.0f,
+    .max_out = 3.00000000f,
+    .output_rate_limit = 1000.00000000f,
+    .error_linear_zone = 28.00000000f,
+    .alpha1 = 0.5f,
+    .alpha2 = 0.25f,
+};
+
+adrc_type_def adrc;
+ADRC_init(&adrc, &param);
+/* 如果摩擦轮已经在稳速运行，可选：ADRC_hot_reset(&adrc, measured_speed_rpm, target_speed_rpm, hold_current_a); */
+out = ADRC_Calc(&adrc, measured_speed_rpm, target_speed_rpm);
+/* 停机或清零时：ADRC_clear(&adrc); */
+
+% ================= 底层通用配置结构 =================
+ADRC_Config cfg = {
+    .sample_time_s = 0.00100000f,
+    .b0 = 5003.73395626f,
+    .controller_bandwidth = 81.75967177f,
+    .observer_bandwidth_ratio = 10.00000000f,
+    .tracking_gain = 0.0f,
+    .output_min = -3.00000000f,
+    .output_max = 3.00000000f,
+    .output_rate_limit = 1000.00000000f,
+    .error_linear_zone = 28.00000000f,
+    .alpha1 = 0.5f,
+    .alpha2 = 0.25f,
+    .motor = 0
+};
