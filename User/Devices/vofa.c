@@ -2,6 +2,7 @@
 #include "bsp_fdcan.h"
 #include "chassis_power_control.h"
 #include "chassis_task.h"
+#include "Omni_chassis.h"
 #include "gimbal_task.h"
 #include "gimbal_behaviour.h"
 #include "yaw_pitch_direct.h"
@@ -165,14 +166,8 @@ void VOFA_SendChassisAnglePidDebug(void)
 
 void VOFA_SendChassisTranslatePairDebug(void)
 {
-    uint8_t motor_a = WHEEL_REAR_205;
-    uint8_t motor_b = WHEEL_FRONT_207;
-
-    if (fabsf(chassis_move.vx_plan) > fabsf(chassis_move.vy_plan))
-    {
-        motor_a = WHEEL_RIGHT_206;
-        motor_b = WHEEL_LEFT_208;
-    }
+    const uint8_t motor_a = CHASSIS_WHEEL_LF;
+    const uint8_t motor_b = CHASSIS_WHEEL_RF;
 
     VOFA_Send6(chassis_move.chassis_3508[motor_a].speed_set,
                chassis_move.chassis_3508[motor_a].speed,

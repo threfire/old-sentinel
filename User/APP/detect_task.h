@@ -6,7 +6,8 @@
 #ifndef DETECT_TASK_H
 #define DETECT_TASK_H
 
-#include "struct_typedef.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 #define DETECT_TASK_INIT_TIME 57
 #define DETECT_CONTROL_TIME 10
@@ -51,11 +52,11 @@ typedef __packed struct
     uint8_t error_exist : 1;
     uint8_t is_lost : 1;
     uint8_t data_is_error : 1;
-    fp32 frequency;
+    float frequency;
 } error_t;
 
 void detect_task(void *pvParameters);
-bool_t toe_is_error(uint8_t err);
+bool toe_is_error(uint8_t err);
 void detect_hook(uint8_t toe);
 const error_t *get_error_list_point(void);
 

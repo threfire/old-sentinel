@@ -1332,6 +1332,11 @@
           <GroupName>APP_Support/common</GroupName>
           <Files>
             <File>
+              <FileName>robot_map.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\User\APP_Support\common\robot_map.h</FilePath>
+            </File>
+            <File>
               <FileName>robot_param.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\User\APP_Support\common\robot_param.h</FilePath>
@@ -1350,21 +1355,6 @@
               <FileName>referee.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\User\APP_Support\common\referee.h</FilePath>
-            </File>
-            <File>
-              <FileName>struct_typedef.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\APP_Support\common\struct_typedef.h</FilePath>
-            </File>
-            <File>
-              <FileName>flash_log.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\APP_Support\common\flash_log.c</FilePath>
-            </File>
-            <File>
-              <FileName>flash_log.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\APP_Support\common\flash_log.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -1582,6 +1572,16 @@
           <GroupName>Devices</GroupName>
           <Files>
             <File>
+              <FileName>motor_feedback.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\motor_feedback.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_feedback.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\User\Devices\motor_feedback.h</FilePath>
+            </File>
+            <File>
               <FileName>vofa.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Devices\vofa.c</FilePath>
@@ -1595,11 +1595,6 @@
               <FileName>hwt_imu.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Devices\hwt_imu.c</FilePath>
-            </File>
-            <File>
-              <FileName>w25q64.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\Devices\w25q64.c</FilePath>
             </File>
           </Files>
         </Group>

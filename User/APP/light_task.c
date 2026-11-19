@@ -134,7 +134,7 @@ static void light_update_online_status(void)
 /* 判断 8 个底盘驱动电机是否全部在线。 */
 static bool light_chassis_motor_online(void)
 {
-    for (uint8_t toe = CHASSIS_MOTOR1_TOE; toe <= CHASSIS_MOTOR4_TOE; toe++)
+    for (uint8_t toe = CHASSIS_MOTOR1_TOE; toe <= CHASSIS_MOTOR8_TOE; toe++)
     {
         if (toe_is_error(toe))
         {

@@ -6,6 +6,8 @@
 #ifndef ROBOT_PARAM_H
 #define ROBOT_PARAM_H
 
+#include "robot_map.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -28,17 +30,14 @@ extern "C" {
 #define ROBOT_TYPE_HERO                  1
 #define ROBOT_GIMBAL_YAW_PITCH_DIRECT   1
 #define ROBOT_CHASSIS_OMNI              1
+#define ROBOT_CHASSIS_STEER             2
 #define ROBOT_FRICTION_3508             1
 
 #define ROBOT_TYPE      ROBOT_TYPE_HERO
 #define ROBOT_GIMBAL    ROBOT_GIMBAL_YAW_PITCH_DIRECT
-#define ROBOT_CHASSIS   ROBOT_CHASSIS_OMNI
+#define ROBOT_CHASSIS   ROBOT_CHASSIS_STEER
 #define ROBOT_FRICTION  ROBOT_FRICTION_3508
 
-
-/* ========================= 外部 Flash 日志配置 ========================= */
-#define FLASH_LOG_ENABLE        0U   // 外部 Flash 错误日志开关，0=关闭，1=开启
-#define FLASH_LOG_QUEUE_DEPTH   8U   // RAM 日志队列深度，控制循环只入队
 
 /* ========================= 云台角度 PID 参数 ========================= */
 /* yaw 轴陀螺仪绝对角控制 PID */
@@ -143,9 +142,6 @@ extern "C" {
 #define INS_GYRO_X_ADDRESS_OFFSET          0      // INS gyro x 索引
 #define INS_GYRO_Y_ADDRESS_OFFSET          1      // INS gyro y 索引
 #define INS_GYRO_Z_ADDRESS_OFFSET          2      // INS gyro z 索引
-#define SHOOT_STRUM_MIT_INDEX              0U     // MIT 电机反馈数组中拨弹电机索引
-#define GIMBAL_YAW_MIT_INDEX               1U     // MIT 电机反馈数组中 yaw 电机索引
-#define GIMBAL_PITCH_DJI_INDEX             4U     // DJI 电机反馈数组中 pitch 电机索引
 #define GIMBAL_MIT_FEEDBACK_INIT_DELAY     100U   // MIT 电机反馈初始化延时，单位 ms
 
 /* ========================= 拨弹控制参数 ========================= */
@@ -209,53 +205,34 @@ extern "C" {
 #define REF_PROTOCOL_FRAME_MAX_SIZE        192   // 裁判系统最大帧长
 #endif
 
-/* ========================= CAN 电机 ID 配置 ========================= */
-/* MIT 电机 CAN ID：命令 ID 为 1~4，反馈 ID 为 0x51~0x54 */
-#define DM_STRUM_CAN_ID                     0X01
-#define DM_BIG_YAW_CAN_ID                   0X02
+/* ========================= 云台机械角度配置 ========================= */
 #define GIMBAL_YAW_SAFE_ANGLE_RAD          2.57f        // 大 yaw 朝前机械角（rad）
-#define DM_YAW_CAN_ID                       DM_BIG_YAW_CAN_ID
-#define DM_STRUM_MASTER_ID                  0X51
-#define DM_BIG_YAW_MASTER_ID                0X52
-#define DM_YAW_MASTER_ID                    DM_BIG_YAW_MASTER_ID
-#define CAN_SMALL_YAW_ID                    0X205 // 小 yaw GM6020 反馈 ID
-#define CAN_SMALL_YAW_CURRENT_CMD_ID        0X1FE // GM6020 电流控制帧 ID
-#define CAN_PITCH_6020_ID                   0X206 // pitch GM6020 反馈 ID
 #define SMALL_YAW_CENTER_ECD                3400U // 小 yaw 中位零点，GM6020 编码器值
 #define SMALL_YAW_CCW_LIMIT_ECD             4200U // 小 yaw 逆时针限幅，GM6020 编码器值
 #define SMALL_YAW_CW_LIMIT_ECD              2600U // 小 yaw 顺时针限幅，GM6020 编码器值
 #define SMALL_YAW_FORWARD_ECD               SMALL_YAW_CENTER_ECD // 小 yaw 朝前零点
-#define CAN_FRIC1_ID                        0X201 // 摩擦轮 1 电机 ID
-#define CAN_FRIC2_ID                        0X202 // 摩擦轮 2 电机 ID
-
-#define CAN_CHASSIS_ALL_ID                0x1FF  // 底盘 3508 电机电流控制广播 ID
-#define CAN_M1_3508_ID                    0x205  // 底盘 3508 电机 1 反馈 ID
-#define CAN_M2_3508_ID                    0x206  // 底盘 3508 电机 2 反馈 ID
-#define CAN_M3_3508_ID                    0x207  // 底盘 3508 电机 3 反馈 ID
-#define CAN_M4_3508_ID                    0x208  // 底盘 3508 电机 4 反馈 ID
-
-#define CHASSIS_MODULE_NUM                4U                 // 底盘电机数量
 
 /* ========================= 底盘几何与电机映射 ========================= */
-/* 十字全向轮底盘：x 轴向右，y 轴向前，轮距 0.56 m */
-#define CHASSIS_HALF_WHEELBASE            0.28f              // 底盘半轮距，用于旋转速度分量计算，单位 m
-#define CHASSIS_OMNI_ROTATE_RADIUS        CHASSIS_HALF_WHEELBASE // 底盘旋转半径，单位 m
-#define Wheel_Radius                      0.075f             // 底盘轮半径，单位 m
-
-#define CHASSIS_WHEEL_205_DIRECTION       1.0f               // 205 号底盘电机方向系数
-#define CHASSIS_WHEEL_206_DIRECTION       -1.0f              // 206 号底盘电机方向系数
-#define CHASSIS_WHEEL_207_DIRECTION       -1.0f              // 207 号底盘电机方向系数
-#define CHASSIS_WHEEL_208_DIRECTION       1.0f               // 208 号底盘电机方向系数
-
-/* 底盘电机 CAN ID 与数组索引映射：205 后轮，206 右轮，207 前轮，208 左轮 */
-#define WHEEL_REAR_205                    0                  // 205 号后轮数组索引
-#define WHEEL_RIGHT_206                   1                  // 206 号右轮数组索引
-#define WHEEL_FRONT_207                   2                  // 207 号前轮数组索引
-#define WHEEL_LEFT_208                    3                  // 208 号左轮数组索引
-#define WHEEL_REAR_RIGHT_205              WHEEL_REAR_205
-#define WHEEL_FRONT_RIGHT_206             WHEEL_RIGHT_206
-#define WHEEL_FRONT_LEFT_207              WHEEL_FRONT_207
-#define WHEEL_REAR_LEFT_208               WHEEL_LEFT_208
+/* 四舵轮顺序：左前、左后、右后、右前；+x 前进，+y 左移。 */
+#define CHASSIS_STEER_HALF_LENGTH_M      0.20f              // 轮心纵向半距，参考工程 20 cm
+#define CHASSIS_STEER_HALF_WIDTH_M       0.175f             // 轮心横向半距，参考工程 17.5 cm
+#define CHASSIS_STEER_ECD_TO_RAD         0.000766990394f    // 6020 编码器计数转 rad
+#define CHASSIS_STEER_OFFSET_LF_RAD      1.95f              // 左前轮正前方向的安装零偏，待实车校准
+#define CHASSIS_STEER_OFFSET_LB_RAD     -1.80f              // 左后轮安装零偏，待实车校准
+#define CHASSIS_STEER_OFFSET_RB_RAD      0.90f              // 右后轮安装零偏，待实车校准
+#define CHASSIS_STEER_OFFSET_RF_RAD      3.30f              // 右前轮安装零偏，待实车校准
+#define CHASSIS_STEER_ANGLE_KP         100.0f              // 6020 角度环输出 rpm/rad
+#define CHASSIS_STEER_ANGLE_KI           0.01f             // 6020 角度环积分
+#define CHASSIS_STEER_ANGLE_KD           0.0f              // 6020 角度环微分
+#define CHASSIS_STEER_ANGLE_MAX_RPM    120.0f              // 6020 目标转速限幅，rpm
+#define CHASSIS_STEER_ANGLE_MAX_IOUT   10.0f              // 6020 角度环积分限幅，rpm
+#define CHASSIS_STEER_SPEED_KP          55.0f              // 6020 速度环比例
+#define CHASSIS_STEER_SPEED_KI           2.4f              // 6020 速度环积分
+#define CHASSIS_STEER_SPEED_KD          80.0f              // 6020 速度环微分
+#define CHASSIS_STEER_CURRENT_MAX     8000.0f              // 6020 电流命令限幅
+#define CHASSIS_STEER_CURRENT_MAX_IOUT 4000.0f             // 6020 电流命令积分限幅
+#define CHASSIS_STEER_STOP_SPEED_MPS    0.02f              // 低于此轮速保持舵向目标，m/s
+#define Wheel_Radius                      0.0567f            // 由参考轮速换算与 19.2032 减速比推得，单位 m
 
 /* ========================= 底盘任务周期与输入映射 ========================= */
 #define CHASSIS_TASK_INIT_TIME            500                // 底盘任务启动延时，单位 ms
@@ -306,7 +283,7 @@ extern "C" {
 #define CHASSIS_CURRENT_FULL_SCALE_A      20.0f              // 3508 电流满量程，单位 A
 #define CHASSIS_CURRENT_CMD_TO_A          (CHASSIS_CURRENT_FULL_SCALE_A / CHASSIS_CURRENT_CMD_FULL_SCALE) // 电流命令转 A 系数，单位 A/电流命令计数
 
-#define MPS_to_RPM                        2445.72f           // 轮速 m/s 转电机 rpm 系数，单位 rpm/(m/s)
+#define MPS_to_RPM                        3234.16461897f     // 参考工程行走轮速度换算，单位 rpm/(m/s)
 #define CHASSIS_RPM_TO_RAD_PER_SEC        0.104719755f       // 电机 rpm 转 rad/s 系数，单位 (rad/s)/rpm
 
 /* ========================= 底盘轮速 PID 与积分清理 ========================= */

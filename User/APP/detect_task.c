@@ -7,16 +7,14 @@
 
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
-#include "flash_log.h"
 #include "remote_control.h"
 #include "task.h"
 #include "usart.h"
 
 static error_t error_list[ERROR_LIST_LENGHT + 1];
 static uint8_t detect_inited = 0U;
-static uint8_t detect_error_last[ERROR_LIST_LENGHT];
 
-static bool_t detect_dbus_rx_active(uint32_t now)
+static bool detect_dbus_rx_active(uint32_t now)
 {
     static uint32_t last_dma_remaining = 0U;
     static uint32_t last_rx_time = 0U;
@@ -25,7 +23,7 @@ static bool_t detect_dbus_rx_active(uint32_t now)
 
     if ((huart5.hdmarx == NULL) || (huart5.hdmarx->Instance == NULL))
     {
-        return 0U;
+        return false;
     }
 
     dma_remaining = __HAL_DMA_GET_COUNTER(huart5.hdmarx);
@@ -34,7 +32,7 @@ static bool_t detect_dbus_rx_active(uint32_t now)
         last_dma_remaining = dma_remaining;
         dma_seen = 1U;
         last_rx_time = now;
-        return 0U;
+        return false;
     }
 
     if (dma_remaining != last_dma_remaining)
@@ -43,7 +41,7 @@ static bool_t detect_dbus_rx_active(uint32_t now)
         last_rx_time = now;
     }
 
-    return (bool_t)((now - last_rx_time) <= DBUS_RX_ACTIVE_HOLD_TIME);
+    return (now - last_rx_time) <= DBUS_RX_ACTIVE_HOLD_TIME;
 }
 
 static void detect_init(uint32_t time)
@@ -55,10 +53,10 @@ static void detect_init(uint32_t time)
         {10, 0, 11},
         {10, 0, 10},
         {10, 0, 9},
-        {2, 3, 16},
-        {2, 3, 15},
-        {2, 3, 14},
-        {2, 3, 13},
+        {10, 0, 16},
+        {10, 0, 15},
+        {10, 0, 14},
+        {10, 0, 13},
         {10, 10, 8},
         {100, 100, 8},
         {100, 100, 8},
@@ -86,7 +84,6 @@ static void detect_init(uint32_t time)
         error_list[i].last_time = time;
         error_list[i].lost_time = time;
         error_list[i].work_time = time;
-        detect_error_last[i] = error_list[i].error_exist;
     }
 
     error_list[ERROR_LIST_LENGHT].enable = 0U;
@@ -148,16 +145,6 @@ void detect_task(void *pvParameters)
                 error_list[i].is_lost = 0U;
                 error_list[i].error_exist = 0U;
             }
-
-            if (detect_error_last[i] != error_list[i].error_exist)
-            {
-                const char *detail = (error_list[i].error_exist != 0U) ? "lost" : "recover";
-
-                (void)flash_log_enqueue_error(FLASH_LOG_SOURCE_DETECT,
-                                              (int16_t)i,
-                                              detail);
-                detect_error_last[i] = error_list[i].error_exist;
-            }
         }
 
         vTaskDelay(DETECT_CONTROL_TIME);
@@ -169,7 +156,7 @@ void detect_task(void *pvParameters)
   * @param[in]      err: TOE 设备编号
   * @retval         1: 离线或错误，0: 在线
   */
-bool_t toe_is_error(uint8_t err)
+bool toe_is_error(uint8_t err)
 {
     if (!detect_inited)
     {
@@ -178,10 +165,10 @@ bool_t toe_is_error(uint8_t err)
 
     if (err >= ERROR_LIST_LENGHT)
     {
-        return 0U;
+        return false;
     }
 
-    return (bool_t)(error_list[err].error_exist == 1U);
+    return error_list[err].error_exist == 1U;
 }
 
 /**
@@ -210,7 +197,7 @@ void detect_hook(uint8_t toe)
     if (error_list[toe].new_time > error_list[toe].last_time)
     {
         error_list[toe].frequency = configTICK_RATE_HZ /
-                                    (fp32)(error_list[toe].new_time - error_list[toe].last_time);
+                                    (float)(error_list[toe].new_time - error_list[toe].last_time);
     }
 }
 

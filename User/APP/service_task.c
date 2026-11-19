@@ -11,7 +11,6 @@
 #include "safewarning.h"
 #include "hwt_imu.h"
 #include "vofa.h"
-#include "flash_log.h"
 #include "task.h"
 service_control_t service_control;
 
@@ -43,7 +42,6 @@ static void service_task(void *pvParameters)
     vTaskDelay(SERVICE_TASK_INIT_TIME);
 		Beep_Init();
 		hwt_imu_init();
-		flash_log_init();
 		Beep_Play(BEEP_POWER_ON);
     service_control.service_time = 0;
 
@@ -54,8 +52,6 @@ static void service_task(void *pvParameters)
 			ws2812_task();
 			Beep_Task();
 			VOFA_ServiceSend();
-			flash_log_service();
-
 			vTaskDelay(SERVICE_CONTROL_TIME);
     }
 }

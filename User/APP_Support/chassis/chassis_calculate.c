@@ -18,11 +18,15 @@
   */
 void chassis_wheel_angle_offset_init(void)
 {
+	static const float offset_rad[CHASSIS_MODULE_NUM] = {
+		CHASSIS_STEER_OFFSET_LF_RAD, CHASSIS_STEER_OFFSET_LB_RAD,
+		CHASSIS_STEER_OFFSET_RB_RAD, CHASSIS_STEER_OFFSET_RF_RAD
+	};
 	for(uint8_t i = 0; i < CHASSIS_MODULE_NUM; i++)
 	{
-		chassis_move.wheel_angle_offset.now[i] = 0.0f;
-		chassis_move.wheel_angle_offset.last[i] = 0.0f;
-		chassis_move.wheel_angle_offset.initial[i] = 0.0f;
+		chassis_move.wheel_angle_offset.now[i] = offset_rad[i];
+		chassis_move.wheel_angle_offset.last[i] = offset_rad[i];
+		chassis_move.wheel_angle_offset.initial[i] = offset_rad[i];
 	}
 }
 
@@ -30,15 +34,15 @@ void chassis_wheel_angle_offset_init(void)
   * @brief          旋转二维向量
   * @retval         none
   */
-void vector_rotate(fp32 angle, fp32 *vector)
+void vector_rotate(float angle, float *vector)
 {
 	if(vector == NULL) return;
 
-	fp32 x_temp = vector[0];
+	float x_temp = vector[0];
 	angle = rad_format(angle);
 
-	fp32 cos_value = cosf(angle);
-	fp32 sin_value = sinf(angle);
+	float cos_value = cosf(angle);
+	float sin_value = sinf(angle);
 
 	vector[0] = cos_value * x_temp - sin_value * vector[1];
 	vector[1] = sin_value * x_temp + cos_value * vector[1];
@@ -48,13 +52,13 @@ void vector_rotate(fp32 angle, fp32 *vector)
   * @brief          限制底盘四轮速度比例
   * @retval         none
   */
-static void limit_chassis_wheel_speed(fp32 *wheel_speed)
+static void limit_chassis_wheel_speed(float *wheel_speed)
 {
-	fp32 max_speed = 0.0f;
+	float max_speed = 0.0f;
 
 	for(uint8_t i = 0; i < CHASSIS_MODULE_NUM; i++)
 	{
-		fp32 speed_abs = fabsf(wheel_speed[i]);
+		float speed_abs = fabsf(wheel_speed[i]);
 		if(speed_abs > max_speed)
 		{
 			max_speed = speed_abs;
@@ -63,7 +67,7 @@ static void limit_chassis_wheel_speed(fp32 *wheel_speed)
 
 	if(max_speed > MAX_WHEEL_SPEED)
 	{
-		fp32 scale = MAX_WHEEL_SPEED / max_speed;
+		float scale = MAX_WHEEL_SPEED / max_speed;
 		for(uint8_t i = 0; i < CHASSIS_MODULE_NUM; i++)
 		{
 			wheel_speed[i] *= scale;
@@ -71,7 +75,7 @@ static void limit_chassis_wheel_speed(fp32 *wheel_speed)
 	}
 }
 
-fp32 offset = 0.0f;
+float offset = 0.0f;
 
 /**
   * @brief          执行底盘打滑补偿
@@ -86,10 +90,10 @@ void slip_control(chassis_move_t *chassis_move)
   * @brief          按横向加速度限制底盘角速度
   * @retval         限幅后的角速度
   */
-fp32 chassis_limit_wz_by_lateral_accel(fp32 vx, fp32 vy, fp32 wz)
+float chassis_limit_wz_by_lateral_accel(float vx, float vy, float wz)
 {
-	fp32 translational_speed = sqrtf(vx * vx + vy * vy);
-	fp32 wz_limit;
+	float translational_speed = sqrtf(vx * vx + vy * vy);
+	float wz_limit;
 
 	if(translational_speed < CHASSIS_LAT_SPEED_EPS)
 	{
@@ -104,25 +108,43 @@ fp32 chassis_limit_wz_by_lateral_accel(fp32 vx, fp32 vy, fp32 wz)
   * @brief          执行底盘逆运动学解算
   * @retval         none
   */
-void chas_inv_cal(fp32 vx_set, fp32 vy_set, fp32 wz_set, fp32 *wheel_angle, fp32 *wheel_speed)
+void chas_inv_cal(float vx_set, float vy_set, float wz_set, float *wheel_angle, float *wheel_speed)
 {
 	if((wheel_angle == NULL) || (wheel_speed == NULL)) return;
-
-	const fp32 wz_speed = wz_set * CHASSIS_OMNI_ROTATE_RADIUS;
-	/* 原车体坐标绕 Z 轴旋转 90 度：原 +Y 对应期望 +X。 */
-	const fp32 coord_x = -vy_set;
-	const fp32 coord_y = vx_set;
-	const fp32 drive_x = (coord_x - coord_y) * 0.70710678f;
-	const fp32 drive_y = (coord_x + coord_y) * 0.70710678f;
-
-	wheel_speed[WHEEL_REAR_205]  = ( drive_y + wz_speed) * CHASSIS_WHEEL_205_DIRECTION;
-	wheel_speed[WHEEL_RIGHT_206] = ( drive_x - wz_speed) * CHASSIS_WHEEL_206_DIRECTION;
-	wheel_speed[WHEEL_FRONT_207] = ( drive_y - wz_speed) * CHASSIS_WHEEL_207_DIRECTION;
-	wheel_speed[WHEEL_LEFT_208]  = ( drive_x + wz_speed) * CHASSIS_WHEEL_208_DIRECTION;
+	static const float x_m[CHASSIS_MODULE_NUM] = {
+		CHASSIS_STEER_HALF_LENGTH_M, -CHASSIS_STEER_HALF_LENGTH_M,
+		-CHASSIS_STEER_HALF_LENGTH_M, CHASSIS_STEER_HALF_LENGTH_M
+	};
+	static const float y_m[CHASSIS_MODULE_NUM] = {
+		CHASSIS_STEER_HALF_WIDTH_M, CHASSIS_STEER_HALF_WIDTH_M,
+		-CHASSIS_STEER_HALF_WIDTH_M, -CHASSIS_STEER_HALF_WIDTH_M
+	};
 
 	for(uint8_t i = 0; i < CHASSIS_MODULE_NUM; i++)
 	{
-		wheel_angle[i] = 0.0f;
+		float wheel_vx = vx_set - wz_set * y_m[i];
+		float wheel_vy = vy_set + wz_set * x_m[i];
+		float angle_error;
+
+		wheel_speed[i] = sqrtf(wheel_vx * wheel_vx + wheel_vy * wheel_vy);
+		if(wheel_speed[i] < CHASSIS_STEER_STOP_SPEED_MPS)
+		{
+			wheel_angle[i] = chassis_move.chassis_6020[i].angle_set;
+			wheel_speed[i] = 0.0f;
+			continue;
+		}
+		wheel_angle[i] = rad_format(atan2f(wheel_vy, wheel_vx));
+		angle_error = rad_format(wheel_angle[i] - chassis_move.chassis_6020[i].angle);
+		if(angle_error > PI * 0.5f)
+		{
+			wheel_angle[i] = rad_format(wheel_angle[i] - PI);
+			wheel_speed[i] = -wheel_speed[i];
+		}
+		else if(angle_error < -PI * 0.5f)
+		{
+			wheel_angle[i] = rad_format(wheel_angle[i] + PI);
+			wheel_speed[i] = -wheel_speed[i];
+		}
 	}
 
 	limit_chassis_wheel_speed(wheel_speed);
@@ -132,35 +154,32 @@ void chas_inv_cal(fp32 vx_set, fp32 vy_set, fp32 wz_set, fp32 *wheel_angle, fp32
   * @brief          执行底盘正运动学解算
   * @retval         none
   */
-void chas_for_cal(fp32 *wheel_angle, fp32 *wheel_speed, fp32 *vx, fp32 *vy, fp32 *wz)
+void chas_for_cal(float *wheel_angle, float *wheel_speed, float *vx, float *vy, float *wz)
 {
-	fp32 rear_speed;
-	fp32 right_speed;
-	fp32 front_speed;
-	fp32 left_speed;
+	static const float x_m[CHASSIS_MODULE_NUM] = {
+		CHASSIS_STEER_HALF_LENGTH_M, -CHASSIS_STEER_HALF_LENGTH_M,
+		-CHASSIS_STEER_HALF_LENGTH_M, CHASSIS_STEER_HALF_LENGTH_M
+	};
+	static const float y_m[CHASSIS_MODULE_NUM] = {
+		CHASSIS_STEER_HALF_WIDTH_M, CHASSIS_STEER_HALF_WIDTH_M,
+		-CHASSIS_STEER_HALF_WIDTH_M, -CHASSIS_STEER_HALF_WIDTH_M
+	};
+	float yaw_numerator = 0.0f;
+	float yaw_denominator = 0.0f;
 
-	(void)wheel_angle;
-
-	if((wheel_speed == NULL) || (vx == NULL) || (vy == NULL) || (wz == NULL)) return;
-
-	rear_speed  = wheel_speed[WHEEL_REAR_205]  * CHASSIS_WHEEL_205_DIRECTION;
-	right_speed = wheel_speed[WHEEL_RIGHT_206] * CHASSIS_WHEEL_206_DIRECTION;
-	front_speed = wheel_speed[WHEEL_FRONT_207] * CHASSIS_WHEEL_207_DIRECTION;
-	left_speed  = wheel_speed[WHEEL_LEFT_208]  * CHASSIS_WHEEL_208_DIRECTION;
-
-	const fp32 drive_x = 0.5f * (right_speed + left_speed);
-	const fp32 drive_y = 0.5f * (rear_speed + front_speed);
-
-	*vx = (drive_y - drive_x) * 0.70710678f;
-	*vy = -(drive_x + drive_y) * 0.70710678f;
-
-	if(fabsf(CHASSIS_OMNI_ROTATE_RADIUS) > 0.0001f)
+	if((wheel_angle == NULL) || (wheel_speed == NULL) || (vx == NULL) || (vy == NULL) || (wz == NULL)) return;
+	*vx = 0.0f;
+	*vy = 0.0f;
+	for(uint8_t i = 0; i < CHASSIS_MODULE_NUM; i++)
 	{
-		*wz = ((rear_speed - front_speed) + (left_speed - right_speed)) /
-		      (4.0f * CHASSIS_OMNI_ROTATE_RADIUS);
+		float wheel_vx = wheel_speed[i] * cosf(wheel_angle[i]);
+		float wheel_vy = wheel_speed[i] * sinf(wheel_angle[i]);
+		*vx += wheel_vx;
+		*vy += wheel_vy;
+		yaw_numerator += -y_m[i] * wheel_vx + x_m[i] * wheel_vy;
+		yaw_denominator += x_m[i] * x_m[i] + y_m[i] * y_m[i];
 	}
-	else
-	{
-		*wz = 0.0f;
-	}
+	*vx /= (float)CHASSIS_MODULE_NUM;
+	*vy /= (float)CHASSIS_MODULE_NUM;
+	*wz = (yaw_denominator > 0.0f) ? yaw_numerator / yaw_denominator : 0.0f;
 }

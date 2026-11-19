@@ -6,7 +6,6 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include "struct_typedef.h"
 
 #define VOFA_CH_COUNT 12U
 #define VOFA_CHASSIS_MOTOR_COUNT 4U

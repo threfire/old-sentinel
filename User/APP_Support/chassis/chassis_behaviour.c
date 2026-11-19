@@ -17,25 +17,25 @@
   * @brief          无力模式速度给定清零
   * @retval         none
   */
-static void chassis_no_move_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector);
+static void chassis_no_move_control(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector);
 
 /**
   * @brief          云台跟随模式速度给定
   * @retval         none
   */
-static void chassis_infantry_follow_gimbal_yaw_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector);
+static void chassis_infantry_follow_gimbal_yaw_control(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector);
 
 /**
   * @brief          底盘航向保持模式速度给定
   * @retval         none
   */
-static void chassis_yaw_hold_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector);
+static void chassis_yaw_hold_control(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector);
 
 /**
   * @brief          小陀螺模式速度给定
   * @retval         none
   */
-static void chassis_spin_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector);
+static void chassis_spin_control(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector);
 
 chassis_behaviour_e chassis_behaviour_mode = CHASSIS_NO_MOVE;
 extern super_cap_mode_e super_cap_mode;
@@ -104,7 +104,7 @@ void chassis_behaviour_mode_set(chassis_move_t *chassis_move_mode)
   * @brief          根据底盘行为模式生成速度给定
   * @retval         none
   */
-void chassis_behaviour_control_set(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector)
+void chassis_behaviour_control_set(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector)
 {
 	if (vx_set == NULL || vy_set == NULL || wz_set == NULL || chassis_move_rc_to_vector == NULL) return;
 
@@ -135,7 +135,7 @@ void chassis_behaviour_control_set(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, cha
   * @brief          无力模式速度给定清零
   * @retval         none
   */
-static void chassis_no_move_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector)
+static void chassis_no_move_control(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector)
 {
     if (vx_set == NULL || vy_set == NULL || wz_set == NULL || chassis_move_rc_to_vector == NULL) return;
     *vx_set = 0.0f;
@@ -144,13 +144,13 @@ static void chassis_no_move_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, ch
 }
 
 // 预留底盘回正模式。
-fp32 chassis_wz_rc_sen = CHASSIS_WZ_RC_SEN;
+float chassis_wz_rc_sen = CHASSIS_WZ_RC_SEN;
 
 /**
   * @brief          云台跟随模式速度给定
   * @retval         none
   */
-static void chassis_infantry_follow_gimbal_yaw_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector)
+static void chassis_infantry_follow_gimbal_yaw_control(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector)
 {
 	if (vx_set == NULL || vy_set == NULL || wz_set == NULL || chassis_move_rc_to_vector == NULL) return;
 
@@ -160,14 +160,14 @@ static void chassis_infantry_follow_gimbal_yaw_control(fp32 *vx_set, fp32 *vy_se
 	int16_t wz_channel = 0;
 	rc_deadband_limit(chassis_move_rc_to_vector->chassis_RC->rc.ch[CHASSIS_WZ_CHANNEL], wz_channel, CHASSIS_RC_DEADLINE);
 
-	*wz_set = (fp32)wz_channel * chassis_wz_rc_sen;
+	*wz_set = (float)wz_channel * chassis_wz_rc_sen;
 }
 
 /**
   * @brief          底盘航向保持模式速度给定
   * @retval         none
   */
-static void chassis_yaw_hold_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector)
+static void chassis_yaw_hold_control(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector)
 {
 	if (vx_set == NULL || vy_set == NULL || wz_set == NULL || chassis_move_rc_to_vector == NULL) return;
 
@@ -176,14 +176,14 @@ static void chassis_yaw_hold_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, c
 	int16_t wz_channel = 0;
 	rc_deadband_limit(chassis_move_rc_to_vector->chassis_RC->rc.ch[CHASSIS_WZ_CHANNEL], wz_channel, CHASSIS_RC_DEADLINE);
 
-	*wz_set = (fp32)wz_channel;
+	*wz_set = (float)wz_channel;
 }
 
 /**
   * @brief          小陀螺模式速度给定
   * @retval         none
   */
-static void chassis_spin_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chassis_move_t *chassis_move_rc_to_vector)
+static void chassis_spin_control(float *vx_set, float *vy_set, float *wz_set, chassis_move_t *chassis_move_rc_to_vector)
 {
 	uint32_t elapsed_ms;
 	float phase;
@@ -213,13 +213,13 @@ static void chassis_spin_control(fp32 *vx_set, fp32 *vy_set, fp32 *wz_set, chass
   * @brief          将遥控器输入转换为底盘平移速度
   * @retval         none
   */
-void chassis_rc_to_control_vector(fp32 *vx_set, fp32 *vy_set, chassis_move_t *chassis_move_rc_to_vector)
+void chassis_rc_to_control_vector(float *vx_set, float *vy_set, chassis_move_t *chassis_move_rc_to_vector)
 {
 	if (chassis_move_rc_to_vector == NULL || vx_set == NULL || vy_set == NULL) return;
 
 	int16_t vx_channel, vy_channel;
-	fp32 vx_set_channel, vy_set_channel;
-	fp32 slope_percentage = 0.30f;
+	float vx_set_channel, vy_set_channel;
+	float slope_percentage = 0.30f;
 	static uint8_t orientation_count[4] = {0};
 
 	rc_deadband_limit(chassis_move_rc_to_vector->chassis_RC->rc.ch[CHASSIS_X_CHANNEL], vx_channel, CHASSIS_RC_DEADLINE);
@@ -230,23 +230,23 @@ void chassis_rc_to_control_vector(fp32 *vx_set, fp32 *vy_set, chassis_move_t *ch
 	if (chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_FRONT_KEY)
 	{
 		if (orientation_count[0] < 210){	orientation_count[0]++; }
-		vx_set_channel = chassis_move_rc_to_vector->vx_max_speed * (slope_percentage + (((fp32)orientation_count[0]) / 300.0f));
+		vx_set_channel = chassis_move_rc_to_vector->vx_max_speed * (slope_percentage + (((float)orientation_count[0]) / 300.0f));
 	}
 	else if (chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_BACK_KEY)
 	{
 		if (orientation_count[1] < 210){	orientation_count[1]++; }
-		vx_set_channel = chassis_move_rc_to_vector->vx_min_speed * (slope_percentage + (((fp32)orientation_count[1]) / 300.0f));
+		vx_set_channel = chassis_move_rc_to_vector->vx_min_speed * (slope_percentage + (((float)orientation_count[1]) / 300.0f));
 	}
 
 	if (chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_LEFT_KEY)
 	{
 		if (orientation_count[2] < 210){	orientation_count[2]++; }
-		vy_set_channel = chassis_move_rc_to_vector->vy_max_speed * (slope_percentage + (((fp32)orientation_count[2]) / 300.0f));
+		vy_set_channel = chassis_move_rc_to_vector->vy_max_speed * (slope_percentage + (((float)orientation_count[2]) / 300.0f));
 	}
 	else if (chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_RIGHT_KEY)
 	{
 		if (orientation_count[2] < 210){	orientation_count[3]++; }
-		vy_set_channel = chassis_move_rc_to_vector->vy_min_speed * (slope_percentage + (((fp32)orientation_count[3]) / 300.0f));
+		vy_set_channel = chassis_move_rc_to_vector->vy_min_speed * (slope_percentage + (((float)orientation_count[3]) / 300.0f));
 	}
 
 	if (!(chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_FRONT_KEY)){ orientation_count[0] = 0; }

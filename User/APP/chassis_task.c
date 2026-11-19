@@ -53,12 +53,12 @@ void chassis_odometer_can_rx(uint16_t can_id, const uint8_t *data, uint8_t len)
     {
         return;
     }
-    memcpy(&chassis_move.odometer.x_mm, &data[2], sizeof(fp32));
-    memcpy(&chassis_move.odometer.y_mm, &data[6], sizeof(fp32));
-    memcpy(&chassis_move.odometer.yaw_deg, &data[10], sizeof(fp32));
-    memcpy(&chassis_move.odometer.gyro_dps, &data[14], sizeof(fp32));
-    memcpy(&chassis_move.odometer.vx_mps, &data[18], sizeof(fp32));
-    memcpy(&chassis_move.odometer.vy_mps, &data[22], sizeof(fp32));
+    memcpy(&chassis_move.odometer.x_mm, &data[2], sizeof(float));
+    memcpy(&chassis_move.odometer.y_mm, &data[6], sizeof(float));
+    memcpy(&chassis_move.odometer.yaw_deg, &data[10], sizeof(float));
+    memcpy(&chassis_move.odometer.gyro_dps, &data[14], sizeof(float));
+    memcpy(&chassis_move.odometer.vx_mps, &data[18], sizeof(float));
+    memcpy(&chassis_move.odometer.vy_mps, &data[22], sizeof(float));
     chassis_move.odometer.vx_mps *= 0.001f;
     chassis_move.odometer.vy_mps *= 0.001f;
     chassis_move.odometer.last_update_tick = HAL_GetTick();

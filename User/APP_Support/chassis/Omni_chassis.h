@@ -1,12 +1,20 @@
 /**
   * @file       Omni_chassis.h
-  * @brief      十字全向底盘控制接口声明
+  * @brief      四舵轮底盘控制接口声明
   * @note       声明底盘弱接口覆盖函数。
   */
 #ifndef OMNI_CHASSIS_H
 #define OMNI_CHASSIS_H
 
 #include "chassis_task.h"
+
+typedef enum
+{
+    CHASSIS_WHEEL_LF = 0,
+    CHASSIS_WHEEL_LB,
+    CHASSIS_WHEEL_RB,
+    CHASSIS_WHEEL_RF,
+} chassis_wheel_index_e;
 
 #ifndef PID_USUAL
 #define PID_USUAL PID_POSITION
@@ -35,7 +43,7 @@ void chassis_set_mode(chassis_move_t *chassis_move_mode);
 void chassis_mode_change_control_transit(chassis_move_t *chassis_move_transit);
 
 /**
-  * @brief          更新底盘电机、正解车速和姿态反馈
+  * @brief          更新四组行走、舵向电机与车体速度反馈
   * @retval         none
   */
 void chassis_feedback_update(chassis_move_t *chassis_move_update);
@@ -47,13 +55,13 @@ void chassis_feedback_update(chassis_move_t *chassis_move_update);
 void chassis_set_contorl(chassis_move_t *chassis_move_control);
 
 /**
-  * @brief          执行底盘前馈、速度环和电流限制控制
+  * @brief          执行舵向双环、行走速度环和电流限制控制
   * @retval         none
   */
 void chassis_control_loop(chassis_move_t *chassis_move_control_loop);
 
 /**
-  * @brief          发送底盘电机电流命令
+  * @brief          发送行走和舵向电机电流命令
   * @retval         none
   */
 void chassis_send_cmd(chassis_move_t *chassis_move_send);

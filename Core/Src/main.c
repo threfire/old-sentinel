@@ -39,7 +39,6 @@
 #include "uproto.h"
 #include "usb_cdc_port.h"
 #include "bsp_tim24.h"
-#include "w25q64.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -130,10 +129,6 @@ int main(void)
   MX_UART8_Init();
   MX_OCTOSPI2_Init();
   /* USER CODE BEGIN 2 */
-	if (OSPI_W25Qxx_Init() != OSPI_W25Qxx_OK)
-	{
-		Error_Handler();
-	}
 //  	Servo_Mapping_Init();
 	bsp_can_init();
 	
