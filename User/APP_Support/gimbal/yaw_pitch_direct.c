@@ -1170,6 +1170,9 @@ __attribute__((used)) void gimbal_init(gimbal_control_t *control)
                     SMALL_YAW_SPEED_PID_KD,
                     SMALL_YAW_SPEED_PID_MAX_OUT,
                     SMALL_YAW_SPEED_PID_MAX_IOUT);
+    control->small_yaw.accel_ff_gain = SMALL_YAW_ACCEL_FF_GAIN;
+    control->small_yaw.ff_max_current_a = SMALL_YAW_FF_MAX_CURRENT_A;
+    control->small_yaw.velocity_ff_gain = SMALL_YAW_VELOCITY_FF_GAIN;
     Motor_ENABLE(&hfdcan1, DM_BIG_YAW_CAN_ID);
 
     gimbal_total_pid_clear(control);
@@ -1454,8 +1457,18 @@ __attribute__((used)) void gimbal_set_control(gimbal_control_t *control)
     gimbal_behaviour_control_set(&add_yaw, &add_pitch, control);
     add_yaw *= -GIMBAL_YAW_FEEDBACK_SIGN;
     small_yaw_target_rad = 0.0f;
+    /* 只有解析扫描轨迹提供前馈，禁止对模式切换和自瞄跳变直接差分。 */
+    control->small_yaw.ref_vel_rad_s = 0.0f;
+    control->small_yaw.ref_accel_rad_s2 = 0.0f;
     auto_enable = (uint8_t)((gimbal_behaviour == GIMBAL_AUTO_SENTINEL) &&
                             (auto_aim_is_active() != 0U));
+    if ((gimbal_behaviour != GIMBAL_DEBUG &&
+         gimbal_behaviour != GIMBAL_AUTO_SENTINEL) || auto_enable != 0U)
+    {
+        /* 退出扫描后，下次从当时的实测角度重新平滑进入。 */
+        control->sine_scan.active = 0U;
+        control->sine_scan.blend = 0.0f;
+    }
     /* 偏航自瞄由小 yaw 执行，大 yaw 保持遥控目标控制。 */
     yaw_rc_enable = 1u;
     pitch_rc_enable =
@@ -1512,6 +1525,8 @@ __attribute__((used)) void gimbal_set_control(gimbal_control_t *control)
     if (gimbal_pitch_6020_feedback_ready() == 0u)
     {
         gimbal_motor_zero_output(pitch_motor);
+        control->sine_scan.active = 0U;
+        control->sine_scan.blend = 0.0f;
         return;
     }
 
@@ -1723,14 +1738,11 @@ static float small_yaw_clamp_target_rad(float target_rad)
 static void gimbal_debug_sine_target_update(gimbal_control_t *control)
 {
     const uint32_t tick_ms = HAL_GetTick();
-    const float small_yaw_sine_value =
-        sinf(2.0f * YAW_PITCH_DIRECT_PI *
-             (float)(tick_ms % SMALL_YAW_DEBUG_SINE_PERIOD_MS) /
-             (float)SMALL_YAW_DEBUG_SINE_PERIOD_MS);
-    const float pitch_sine_value =
-        sinf(2.0f * YAW_PITCH_DIRECT_PI *
-             (float)(tick_ms % PITCH_DEBUG_SINE_PERIOD_MS) /
-             (float)PITCH_DEBUG_SINE_PERIOD_MS);
+    uint32_t elapsed_ms;
+    float blend;
+    float blend_vel = 0.0f;
+    float blend_accel = 0.0f;
+    gimbal_sine_scan_t *scan;
     gimbal_motor_t *pitch_motor;
 
     if (control == 0)
@@ -1738,17 +1750,75 @@ static void gimbal_debug_sine_target_update(gimbal_control_t *control)
         return;
     }
 
+    scan = &control->sine_scan;
+    pitch_motor = &control->gimbal_pitch_motor;
+    if (scan->active == 0U)
+    {
+        scan->start_tick = tick_ms;
+        scan->small_yaw_start_rad = small_yaw_angle_rad;
+        scan->pitch_start_rad = pitch_motor->relative_angle;
+        scan->active = 1U;
+    }
+
+    /* 用本次扫描的相对时间生成正弦，避免上电时刻影响进入相位。 */
+    elapsed_ms = tick_ms - scan->start_tick;
+#if (GIMBAL_DEBUG_SINE_ENTRY_MS > 0U)
+    blend = gimbal_mit_clamp((float)elapsed_ms / (float)GIMBAL_DEBUG_SINE_ENTRY_MS,
+                             0.0f, 1.0f);
+    if (elapsed_ms < GIMBAL_DEBUG_SINE_ENTRY_MS)
+    {
+        const float entry_s = (float)GIMBAL_DEBUG_SINE_ENTRY_MS * 0.001f;
+        blend_vel = 6.0f * blend * (1.0f - blend) / entry_s;
+        blend_accel = (6.0f - 12.0f * blend) / (entry_s * entry_s);
+    }
+    blend = blend * blend * (3.0f - 2.0f * blend);
+#else
+    blend = 1.0f;
+#endif
+    scan->blend = blend;
+
 #if (GIMBAL_DEBUG_SMALL_YAW_SINE_ENABLE != 0U)
-    small_yaw_target_rad = gimbal_mit_clamp(
-        SMALL_YAW_SCAN_LIMIT_RAD * small_yaw_sine_value,
-        -SMALL_YAW_SCAN_LIMIT_RAD,
-        SMALL_YAW_SCAN_LIMIT_RAD);
-    small_yaw_target_rad = small_yaw_clamp_target_rad(small_yaw_target_rad);
+    {
+        const float omega = 2.0f * YAW_PITCH_DIRECT_PI /
+                            ((float)SMALL_YAW_DEBUG_SINE_PERIOD_MS * 0.001f);
+        const float phase = 2.0f * YAW_PITCH_DIRECT_PI *
+                            (float)(elapsed_ms % SMALL_YAW_DEBUG_SINE_PERIOD_MS) /
+                            (float)SMALL_YAW_DEBUG_SINE_PERIOD_MS;
+        const float small_yaw_sine_value =
+            sinf(phase);
+        const float sine_target = gimbal_mit_clamp(
+            SMALL_YAW_SCAN_LIMIT_RAD * small_yaw_sine_value,
+            -SMALL_YAW_SCAN_LIMIT_RAD,
+            SMALL_YAW_SCAN_LIMIT_RAD);
+        const float sine_vel = SMALL_YAW_SCAN_LIMIT_RAD * omega * cosf(phase);
+        const float sine_accel = -omega * omega * sine_target;
+        const float target = scan->small_yaw_start_rad +
+                             blend * (sine_target - scan->small_yaw_start_rad);
+        small_yaw_target_rad = small_yaw_clamp_target_rad(target);
+        if (small_yaw_target_rad == target)
+        {
+            /* 对 theta0 + s(t)*(q(t)-theta0) 求导，含入口混合项。 */
+            control->small_yaw.ref_vel_rad_s =
+                blend_vel * (sine_target - scan->small_yaw_start_rad) + blend * sine_vel;
+            control->small_yaw.ref_accel_rad_s2 =
+                blend_accel * (sine_target - scan->small_yaw_start_rad) +
+                2.0f * blend_vel * sine_vel + blend * sine_accel;
+        }
+        else
+        {
+            /* 目标被机械限幅时，不沿用未限幅轨迹的速度/加速度。 */
+            control->small_yaw.ref_vel_rad_s = 0.0f;
+            control->small_yaw.ref_accel_rad_s2 = 0.0f;
+        }
+    }
 #endif
 
 #if (GIMBAL_DEBUG_PITCH_SINE_ENABLE != 0U)
-    pitch_motor = &control->gimbal_pitch_motor;
     {
+        const float pitch_sine_value =
+            sinf(2.0f * YAW_PITCH_DIRECT_PI *
+                 (float)(elapsed_ms % PITCH_DEBUG_SINE_PERIOD_MS) /
+                 (float)PITCH_DEBUG_SINE_PERIOD_MS);
         const float pitch_center =
             0.5f * (pitch_motor->min_relative_angle + pitch_motor->max_relative_angle);
         float pitch_half_range =
@@ -1757,8 +1827,12 @@ static void gimbal_debug_sine_target_update(gimbal_control_t *control)
         {
             pitch_half_range = PITCH_SCAN_LIMIT_RAD;
         }
-        const float pitch_target = gimbal_mit_clamp(
+        const float pitch_sine_target = gimbal_mit_clamp(
             pitch_center + pitch_half_range * pitch_sine_value,
+            pitch_motor->min_relative_angle,
+            pitch_motor->max_relative_angle);
+        const float pitch_target = gimbal_mit_clamp(
+            scan->pitch_start_rad + blend * (pitch_sine_target - scan->pitch_start_rad),
             pitch_motor->min_relative_angle,
             pitch_motor->max_relative_angle);
 
@@ -1788,6 +1862,7 @@ static void small_yaw_scan_update(gimbal_control_t *control, uint8_t auto_enable
 
 static void small_yaw_control_update(void)
 {
+    gimbal_small_yaw_t *small = &gimbal_control.small_yaw;
     const float control_dt = (float)GIMBAL_CONTROL_TIME * 0.001f;
     const float speed_feedback_alpha = gimbal_mit_clamp(SMALL_YAW_SPEED_FEEDBACK_ALPHA, 0.0f, 1.0f);
     float angle_error;
@@ -1810,6 +1885,11 @@ static void small_yaw_control_update(void)
         small_yaw_speed_feedback_rad_s = 0.0f;
         small_yaw_speed_pid.out = 0.0f;
         small_yaw_current_cmd_a = 0.0f;
+        small->ref_vel_rad_s = 0.0f;
+        small->ref_accel_rad_s2 = 0.0f;
+        small->ff_current_a = 0.0f;
+        small->pid_current_a = 0.0f;
+        small->velocity_ff_rad_s = 0.0f;
         return;
     }
 
@@ -1830,17 +1910,51 @@ static void small_yaw_control_update(void)
     small_yaw_angle_pid.Pout = small_yaw_angle_pid.Kp * angle_error;
     small_yaw_angle_pid.Iout = 0.0f;
     small_yaw_angle_pid.Dout = -small_yaw_angle_pid.Kd * small_yaw_speed_feedback_rad_s;
-    speed_set = gimbal_mit_clamp(small_yaw_angle_pid.Pout +
-                                 small_yaw_angle_pid.Dout,
+    /* gain=1 时：v_set = v_ref + Kp*e + Kd*(v_ref-v_fdb)。
+     * ref_vel 已包含 smoothstep 导数，退出扫描/自瞄时在目标生成层清零。 */
+    small->velocity_ff_rad_s = 0.0f;
+    if (isfinite(small->velocity_ff_gain) && small->velocity_ff_gain > 0.0f &&
+        isfinite(small->ref_vel_rad_s))
+    {
+        const float velocity_ff = small->velocity_ff_gain *
+                                  (1.0f + small_yaw_angle_pid.Kd) * small->ref_vel_rad_s;
+        if (isfinite(velocity_ff))
+        {
+            small->velocity_ff_rad_s = velocity_ff;
+        }
+    }
+    speed_set = gimbal_mit_clamp(SMALL_YAW_SPEED_OUTPUT_SCALE *
+                                 (small_yaw_angle_pid.Pout +
+                                  small_yaw_angle_pid.Dout + small->velocity_ff_rad_s),
                                  -small_yaw_angle_pid.max_out,
                                  small_yaw_angle_pid.max_out);
-    small_yaw_angle_pid.out = speed_set;
+
+    /* 力矩前馈换算到电流端，不能直接加到单位为 rad/s 的角度环输出。 */
+    small->ff_current_a = 0.0f;
+    if (isfinite(small->accel_ff_gain) && small->accel_ff_gain > 0.0f &&
+        isfinite(small->ff_max_current_a) && small->ff_max_current_a > 0.0f &&
+        isfinite(small->ref_accel_rad_s2))
+    {
+        const float ff_limit = gimbal_mit_clamp(small->ff_max_current_a,
+                                               0.0f, SMALL_YAW_6020_CURRENT_LIMIT_A);
+        const float ff_current = small->accel_ff_gain * small->ref_accel_rad_s2;
+        if (isfinite(ff_current))
+        {
+            small->ff_current_a = gimbal_mit_clamp(ff_current, -ff_limit, ff_limit);
+        }
+    }
 
     {
         const float ccw_limit_rad =
             small_yaw_ecd_to_angle_rad(SMALL_YAW_CCW_LIMIT_ECD);
         const float cw_limit_rad =
             small_yaw_ecd_to_angle_rad(SMALL_YAW_CW_LIMIT_ECD);
+
+        if ((small_yaw_angle_rad >= ccw_limit_rad && small->ff_current_a > 0.0f) ||
+            (small_yaw_angle_rad <= cw_limit_rad && small->ff_current_a < 0.0f))
+        {
+            small->ff_current_a = 0.0f;
+        }
 
         if ((small_yaw_angle_rad >= ccw_limit_rad && speed_set > 0.0f) ||
             (small_yaw_angle_rad <= cw_limit_rad && speed_set < 0.0f))
@@ -1853,8 +1967,11 @@ static void small_yaw_control_update(void)
     if (outward_limit != 0U)
     {
         small_yaw_speed_pid.Iout = 0.0f;
+        small->ff_current_a = 0.0f;
     }
 
+    /* 记录限速及机械限位处理后真正交给速度环的指令。 */
+    small_yaw_angle_pid.out = speed_set;
     speed_error = speed_set - small_yaw_speed_feedback_rad_s;
     speed_error = gimbal_mit_clamp(speed_error,
                                    -SMALL_YAW_SPEED_ERROR_LIMIT_RAD_S,
@@ -1875,14 +1992,16 @@ static void small_yaw_control_update(void)
     integral_candidate = gimbal_mit_clamp(integral_candidate,
                                           -small_yaw_speed_pid.max_iout,
                                           small_yaw_speed_pid.max_iout);
-    output = small_yaw_speed_pid.Pout + integral_candidate;
+    /* 抗饱和判断包含前馈，避免总电流饱和后积分仍继续累积。 */
+    output = small_yaw_speed_pid.Pout + integral_candidate + small->ff_current_a;
     if ((output < small_yaw_speed_pid.max_out && output > -small_yaw_speed_pid.max_out) ||
         (output >= small_yaw_speed_pid.max_out && speed_error < 0.0f) ||
         (output <= -small_yaw_speed_pid.max_out && speed_error > 0.0f))
     {
         small_yaw_speed_pid.Iout = integral_candidate;
     }
-    output = gimbal_mit_clamp(small_yaw_speed_pid.Pout + small_yaw_speed_pid.Iout,
+    small->pid_current_a = small_yaw_speed_pid.Pout + small_yaw_speed_pid.Iout;
+    output = gimbal_mit_clamp(small->pid_current_a + small->ff_current_a,
                               -small_yaw_speed_pid.max_out,
                               small_yaw_speed_pid.max_out);
     small_yaw_speed_pid.Dout = 0.0f;

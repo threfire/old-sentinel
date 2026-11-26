@@ -73,13 +73,19 @@ extern "C" {
 #define SMALL_YAW_ANGLE_PID_KI            0.0f
 #define SMALL_YAW_ANGLE_PID_KD            0.08f
 #define SMALL_YAW_ANGLE_PID_MAX_OUT       2.0f
-#define SMALL_YAW_SPEED_PID_KP            1.4f
+#define SMALL_YAW_SPEED_PID_KP            1.5f
 #define SMALL_YAW_SPEED_PID_KI            0.02f
-#define SMALL_YAW_SPEED_PID_KD            0.1f
+#define SMALL_YAW_SPEED_PID_KD            0.07f
 #define SMALL_YAW_SPEED_PID_MAX_OUT       SMALL_YAW_6020_CURRENT_LIMIT_A
 #define SMALL_YAW_SPEED_PID_MAX_IOUT      0.2f
 #define SMALL_YAW_SPEED_FEEDBACK_ALPHA    0.05f
 #define SMALL_YAW_SPEED_ERROR_LIMIT_RAD_S 3.5f
+/* 惯量力矩前馈：I_ff = (J / Kt) * 目标角加速度；未知 J/Kt 时从 0 在线整定。 */
+#define SMALL_YAW_ACCEL_FF_GAIN           0.015f  /* 等效 J/Kt，单位 A/(rad/s^2) */
+#define SMALL_YAW_FF_MAX_CURRENT_A        0.3f  /* 前馈电流独立限幅，仍受总电流限幅约束 */
+#define SMALL_YAW_SPEED_OUTPUT_SCALE     1.8f /* 目标振幅/实际振幅的估计值；1 为不缩放，在限速前生效 */
+/* 速度前馈 = gain * (1 + 角度 Kd) * 参考速度；0 关闭，1 为完整参考速度补偿。 */
+#define SMALL_YAW_VELOCITY_FF_GAIN        0.64f  /* 无量纲，从小值在线整定 */
 
 /* ========================= 云台前馈与输出配置 ========================= */
 #define YAW_REF_VEL_FILTER_ALPHA           0.05f   // yaw 目标角差分速度低通系数
@@ -109,6 +115,7 @@ extern "C" {
 /* 自动哨兵正弦扫描参数：开关、角度幅值、周期和线性扫描速度。 */
 #define GIMBAL_DEBUG_SMALL_YAW_SINE_ENABLE 1U
 #define GIMBAL_DEBUG_PITCH_SINE_ENABLE     1U
+#define GIMBAL_DEBUG_SINE_ENTRY_MS         800U                /* 进入正弦扫描的平滑过渡时间，0 表示直接进入，单位 ms */
 #define SMALL_YAW_SCAN_LIMIT_RAD           (30.0f * PI / 180.0f) /* 小 yaw 幅值，单位 rad */
 #define PITCH_SCAN_LIMIT_RAD               (30.0f * PI / 180.0f) /* pitch 幅值，单位 rad */
 #define SMALL_YAW_DEBUG_SINE_PERIOD_MS     2000U               /* 小 yaw 正弦周期，单位 ms */
@@ -207,9 +214,9 @@ extern "C" {
 
 /* ========================= 云台机械角度配置 ========================= */
 #define GIMBAL_YAW_SAFE_ANGLE_RAD          2.57f        // 大 yaw 朝前机械角（rad）
-#define SMALL_YAW_CENTER_ECD                3400U // 小 yaw 中位零点，GM6020 编码器值
-#define SMALL_YAW_CCW_LIMIT_ECD             4200U // 小 yaw 逆时针限幅，GM6020 编码器值
-#define SMALL_YAW_CW_LIMIT_ECD              2600U // 小 yaw 顺时针限幅，GM6020 编码器值
+#define SMALL_YAW_CENTER_ECD                1300U // 小 yaw 中位零点，GM6020 编码器值
+#define SMALL_YAW_CCW_LIMIT_ECD             2100U // 小 yaw 逆时针限幅，GM6020 编码器值
+#define SMALL_YAW_CW_LIMIT_ECD              500U // 小 yaw 顺时针限幅，GM6020 编码器值
 #define SMALL_YAW_FORWARD_ECD               SMALL_YAW_CENTER_ECD // 小 yaw 朝前零点
 
 /* ========================= 底盘几何与电机映射 ========================= */
