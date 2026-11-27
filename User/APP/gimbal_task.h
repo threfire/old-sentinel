@@ -107,6 +107,14 @@ typedef struct
     uint8_t scan_yaw_direction;         // 小 yaw 扫描方向
     uint8_t scan_pitch_direction;       // pitch 扫描方向
     float scan_pitch_target_rad;        // pitch 扫描目标角度，单位 rad
+    float ref_vel_rad_s;               // 最终扫描轨迹参考速度，非速度环指令
+    float ref_accel_rad_s2;            // 最终扫描轨迹参考角加速度
+    float accel_ff_gain;               // 可在线整定的等效 J/Kt，A/(rad/s^2)
+    float ff_max_current_a;            // 前馈电流独立限幅，单位 A
+    float ff_current_a;                // 限幅及保护后的惯量前馈电流，单位 A
+    float pid_current_a;               // 速度 PI 电流贡献（总限幅之前），单位 A
+    float velocity_ff_gain;            // 速度前馈比例，0 关闭，1 为完整补偿
+    float velocity_ff_rad_s;           // 速度前馈贡献，合成限幅前，单位 rad/s
 } gimbal_small_yaw_t;
 
 typedef struct
@@ -129,6 +137,15 @@ typedef struct
     bool strum_enabled;
 } gimbal_behaviour_state_t;
 
+typedef struct
+{
+    uint8_t active;                    // 正弦扫描是否已进入
+    uint32_t start_tick;               // 本次扫描起始时刻，单位 ms
+    float small_yaw_start_rad;         // 进入扫描时的小 yaw 实测角度
+    float pitch_start_rad;             // 进入扫描时的 pitch 实测角度
+    float blend;                       // smoothstep 混合系数，范围 0~1
+} gimbal_sine_scan_t;
+
 typedef struct gimbal_control_t
 {
     const RC_ctrl_t *gimbal_rc_ctrl;
@@ -140,6 +157,7 @@ typedef struct gimbal_control_t
     gravity_comp_t gimbal_pitch_gravity_comp;
     gimbal_small_yaw_t small_yaw;
     gimbal_behaviour_state_t behaviour_state;
+    gimbal_sine_scan_t sine_scan;
 } gimbal_control_t;
 
 extern gimbal_control_t gimbal_control;
