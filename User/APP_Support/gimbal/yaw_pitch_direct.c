@@ -1446,6 +1446,8 @@ __attribute__((used)) void gimbal_set_control(gimbal_control_t *control)
     uint8_t auto_enable;
     uint8_t yaw_rc_enable;
     uint8_t pitch_rc_enable;
+    uint8_t scan_requested;
+    uint8_t scan_allowed;
     gimbal_motor_t *yaw_motor;
     gimbal_motor_t *pitch_motor;
 
@@ -1457,17 +1459,43 @@ __attribute__((used)) void gimbal_set_control(gimbal_control_t *control)
     gimbal_behaviour_control_set(&add_yaw, &add_pitch, control);
     add_yaw *= -GIMBAL_YAW_FEEDBACK_SIGN;
     small_yaw_target_rad = 0.0f;
-    /* 只有解析扫描轨迹提供前馈，禁止对模式切换和自瞄跳变直接差分。 */
+    /* 扫描及其退出过渡提供解析前馈，禁止对自瞄跳变直接差分。 */
     control->small_yaw.ref_vel_rad_s = 0.0f;
     control->small_yaw.ref_accel_rad_s2 = 0.0f;
     auto_enable = (uint8_t)((gimbal_behaviour == GIMBAL_AUTO_SENTINEL) &&
                             (auto_aim_is_active() != 0U));
-    if ((gimbal_behaviour != GIMBAL_DEBUG &&
-         gimbal_behaviour != GIMBAL_AUTO_SENTINEL) || auto_enable != 0U)
+    scan_requested = (uint8_t)(gimbal_behaviour == GIMBAL_DEBUG ||
+        (gimbal_behaviour == GIMBAL_AUTO_SENTINEL && auto_enable == 0U));
+    scan_allowed = (uint8_t)(control->gimbal_yaw_motor.mode != GIMBAL_MOTOR_RAW &&
+        !toe_is_error(DBUS_TOE) && gimbal_pitch_6020_feedback_ready() != 0U &&
+        DJI_MOTOR_MEASURE[3].last_fdb_time != 0U &&
+        (HAL_GetTick() - DJI_MOTOR_MEASURE[3].last_fdb_time) <= 100U);
+    if (scan_allowed == 0U || auto_enable != 0U)
     {
-        /* 退出扫描后，下次从当时的实测角度重新平滑进入。 */
+        /* 无力、离线及自瞄接管立即取消扫描和退出过渡。 */
         control->sine_scan.active = 0U;
         control->sine_scan.blend = 0.0f;
+        control->sine_scan.exit_active = 0U;
+        control->sine_scan.exit_blend = 0.0f;
+    }
+    else if (scan_requested != 0U && control->sine_scan.exit_active != 0U)
+    {
+        control->sine_scan.active = 0U;
+        control->sine_scan.exit_active = 0U;
+        control->sine_scan.exit_blend = 0.0f;
+    }
+    else if (scan_requested == 0U && control->sine_scan.active != 0U &&
+             control->sine_scan.exit_active == 0U)
+    {
+#if (GIMBAL_DEBUG_SINE_EXIT_MS > 0U)
+        control->sine_scan.exit_start_tick = HAL_GetTick();
+        control->sine_scan.exit_pitch_target_rad = control->gimbal_pitch_motor.relative_angle_set;
+        control->sine_scan.exit_blend = 0.0f;
+        control->sine_scan.exit_active = 1U;
+#else
+        control->sine_scan.active = 0U;
+        control->sine_scan.exit_blend = 1.0f;
+#endif
     }
     /* 偏航自瞄由小 yaw 执行，大 yaw 保持遥控目标控制。 */
     yaw_rc_enable = 1u;
@@ -1527,6 +1555,8 @@ __attribute__((used)) void gimbal_set_control(gimbal_control_t *control)
         gimbal_motor_zero_output(pitch_motor);
         control->sine_scan.active = 0U;
         control->sine_scan.blend = 0.0f;
+        control->sine_scan.exit_active = 0U;
+        control->sine_scan.exit_blend = 0.0f;
         return;
     }
 
@@ -1573,11 +1603,11 @@ __attribute__((used)) void gimbal_set_control(gimbal_control_t *control)
 
     }
 
-    if (gimbal_behaviour == GIMBAL_DEBUG)
+    if (scan_allowed != 0U && (scan_requested != 0U || control->sine_scan.exit_active != 0U))
     {
         gimbal_debug_sine_target_update(control);
     }
-    else if (gimbal_behaviour == GIMBAL_AUTO_SENTINEL)
+    else if (gimbal_behaviour == GIMBAL_AUTO_SENTINEL && auto_enable != 0U)
     {
         small_yaw_scan_update(control, auto_enable);
     }
@@ -1758,6 +1788,7 @@ static void gimbal_debug_sine_target_update(gimbal_control_t *control)
         scan->small_yaw_start_rad = small_yaw_angle_rad;
         scan->pitch_start_rad = pitch_motor->relative_angle;
         scan->active = 1U;
+        scan->exit_blend = 0.0f;
     }
 
     /* 用本次扫描的相对时间生成正弦，避免上电时刻影响进入相位。 */
@@ -1843,6 +1874,56 @@ static void gimbal_debug_sine_target_update(gimbal_control_t *control)
     }
 #else
     (void)pitch_motor;
+#endif
+
+#if (GIMBAL_DEBUG_SINE_EXIT_MS > 0U)
+    if (scan->exit_active != 0U)
+    {
+        const uint32_t exit_elapsed_ms = tick_ms - scan->exit_start_tick;
+        const float duration_s = (float)GIMBAL_DEBUG_SINE_EXIT_MS * 0.001f;
+        const float u = gimbal_mit_clamp((float)exit_elapsed_ms /
+                                        (float)GIMBAL_DEBUG_SINE_EXIT_MS, 0.0f, 1.0f);
+        const float s = u * u * (3.0f - 2.0f * u);
+        const float s_vel = (exit_elapsed_ms < GIMBAL_DEBUG_SINE_EXIT_MS) ?
+                            6.0f * u * (1.0f - u) / duration_s : 0.0f;
+        const float s_accel = (exit_elapsed_ms < GIMBAL_DEBUG_SINE_EXIT_MS) ?
+                              (6.0f - 12.0f * u) / (duration_s * duration_s) : 0.0f;
+        scan->exit_blend = s;
+#if (GIMBAL_DEBUG_SMALL_YAW_SINE_ENABLE != 0U)
+        {
+            const float q = small_yaw_target_rad;
+            const float v = control->small_yaw.ref_vel_rad_s;
+            const float a = control->small_yaw.ref_accel_rad_s2;
+            /* theta=(1-s)*q：延续扫描相位，起点速度连续，终点回零且速度为零。 */
+            const float target = (1.0f - s) * q;
+            small_yaw_target_rad = small_yaw_clamp_target_rad(target);
+            control->small_yaw.ref_vel_rad_s = (1.0f - s) * v - s_vel * q;
+            control->small_yaw.ref_accel_rad_s2 =
+                (1.0f - s) * a - 2.0f * s_vel * v - s_accel * q;
+            if (small_yaw_target_rad != target)
+            {
+                control->small_yaw.ref_vel_rad_s = 0.0f;
+                control->small_yaw.ref_accel_rad_s2 = 0.0f;
+            }
+        }
+#endif
+#if (GIMBAL_DEBUG_PITCH_SINE_ENABLE != 0U)
+        {
+            const float target = gimbal_mit_clamp(
+                (1.0f - s) * pitch_motor->relative_angle_set + s * scan->exit_pitch_target_rad,
+                pitch_motor->min_relative_angle, pitch_motor->max_relative_angle);
+            pitch_motor->rc_relative_angle_set = target;
+            pitch_motor->auto_relative_angle_set = target;
+            pitch_motor->relative_angle_set = target;
+            pitch_motor->absolute_angle_set = target;
+        }
+#endif
+        if (exit_elapsed_ms >= GIMBAL_DEBUG_SINE_EXIT_MS)
+        {
+            scan->active = 0U;
+            scan->exit_active = 0U;
+        }
+    }
 #endif
 }
 

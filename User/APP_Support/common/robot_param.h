@@ -73,7 +73,7 @@ extern "C" {
 #define SMALL_YAW_ANGLE_PID_KI            0.0f
 #define SMALL_YAW_ANGLE_PID_KD            0.08f
 #define SMALL_YAW_ANGLE_PID_MAX_OUT       2.0f
-#define SMALL_YAW_SPEED_PID_KP            1.5f
+#define SMALL_YAW_SPEED_PID_KP            1.3f
 #define SMALL_YAW_SPEED_PID_KI            0.02f
 #define SMALL_YAW_SPEED_PID_KD            0.07f
 #define SMALL_YAW_SPEED_PID_MAX_OUT       SMALL_YAW_6020_CURRENT_LIMIT_A
@@ -116,6 +116,7 @@ extern "C" {
 #define GIMBAL_DEBUG_SMALL_YAW_SINE_ENABLE 1U
 #define GIMBAL_DEBUG_PITCH_SINE_ENABLE     1U
 #define GIMBAL_DEBUG_SINE_ENTRY_MS         800U                /* 进入正弦扫描的平滑过渡时间，0 表示直接进入，单位 ms */
+#define GIMBAL_DEBUG_SINE_EXIT_MS          800U                /* 正常退出扫描的平滑停止时间，0 表示直接退出，单位 ms */
 #define SMALL_YAW_SCAN_LIMIT_RAD           (30.0f * PI / 180.0f) /* 小 yaw 幅值，单位 rad */
 #define PITCH_SCAN_LIMIT_RAD               (30.0f * PI / 180.0f) /* pitch 幅值，单位 rad */
 #define SMALL_YAW_DEBUG_SINE_PERIOD_MS     2000U               /* 小 yaw 正弦周期，单位 ms */
