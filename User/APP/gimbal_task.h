@@ -144,6 +144,10 @@ typedef struct
     float small_yaw_start_rad;         // 进入扫描时的小 yaw 实测角度
     float pitch_start_rad;             // 进入扫描时的 pitch 实测角度
     float blend;                       // smoothstep 混合系数，范围 0~1
+    uint8_t exit_active;               // 正在正常退出扫描（无力保护不等待）
+    uint32_t exit_start_tick;          // 退出过渡开始时刻，单位 ms
+    float exit_blend;                  // 退出进度：0 扫描，1 停止
+    float exit_pitch_target_rad;       // pitch 停在退出瞬间的目标位置
 } gimbal_sine_scan_t;
 
 typedef struct gimbal_control_t
